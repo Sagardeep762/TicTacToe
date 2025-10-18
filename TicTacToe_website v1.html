@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic Tac Toe</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for a modern, playful look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent; /* Removes blue tap highlight on mobile */
+        }
+        .font-brand {
+            font-family: 'Fredoka One', cursive;
+        }
+        /* Custom styles for the game cells */
+        .cell {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 4rem; /* Responsive font size will be handled by JS */
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+        }
+        .cell:hover {
+            background-color: #374151; /* gray-700 */
+        }
+        .cell-x {
+            color: #34D399; /* emerald-400 */
+        }
+        .cell-o {
+            color: #F87171; /* red-400 */
+        }
+        /* Winning cell animation */
+        .winning-cell {
+            animation: bounce 0.6s ease-in-out;
+        }
+        @keyframes bounce {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.2);
+            }
+        }
+        /* Classic Tic Tac Toe Grid Lines */
+        .cell:not(:nth-child(3n)) {
+            border-right: 4px solid #4B5563; /* border-gray-600 */
+        }
+        .cell:not(:nth-child(n+7)) {
+            border-bottom: 4px solid #4B5563; /* border-gray-600 */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="text-center w-full max-w-md mx-auto">
+        <!-- Game Title -->
+        <h1 class="text-5xl md:text-6xl font-brand text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-red-400 mb-4">
+            Tic Tac Toe
+        </h1>
+
+        <!-- Game Status Display -->
+        <p id="status" class="text-xl md:text-2xl text-gray-300 h-12 flex items-center justify-center mb-4 rounded-lg bg-gray-800/50 px-4">
+            X's Turn
+        </p>
+
+        <!-- Game Board -->
+        <div id="game-board" class="grid grid-cols-3 grid-rows-3 bg-gray-800/50 rounded-xl shadow-2xl aspect-square">
+            <!-- Cells will be created by JavaScript -->
+        </div>
+
+        <!-- Restart Button -->
+        <button id="restart-button" class="mt-8 w-full bg-emerald-500 hover:bg-emerald-600 text-gray-900 font-bold py-3 px-6 rounded-lg text-lg shadow-lg transform transition-transform duration-200 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-emerald-300">
+            Restart Game
+        </button>
+    </div>
+    
+    <!-- Modal for displaying game result -->
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-gray-800 rounded-2xl shadow-xl p-8 text-center transform transition-all scale-95 opacity-0" id="modal-content">
+            <h2 id="modal-title" class="text-4xl font-brand mb-4"></h2>
+            <p id="modal-message" class="text-lg text-gray-400 mb-6"></p>
+            <button id="modal-button" class="bg-emerald-500 hover:bg-emerald-600 text-gray-900 font-bold py-3 px-8 rounded-lg text-lg shadow-lg transform transition-transform duration-200 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-emerald-300">
+                Play Again
+            </button>
+        </div>
+    </div>
+
+
+    <script>
+        // --- DOM Elements ---
+        const gameBoard = document.getElementById('game-board');
+        const statusDisplay = document.getElementById('status');
+        const restartButton = document.getElementById('restart-button');
+        const modal = document.getElementById('modal');
+        const modalContent = document.getElementById('modal-content');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalButton = document.getElementById('modal-button');
+
+        // --- Game State Variables ---
+        let gameActive = true;
+        let currentPlayer = 'X';
+        let gameState = ["", "", "", "", "", "", "", "", ""];
+
+        const winningConditions = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+            [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+            [0, 4, 8], [2, 4, 6]             // Diagonals
+        ];
+
+        const winningMessage = () => `${currentPlayer} Wins!`;
+        const drawMessage = () => `It's a Draw!`;
+        const currentPlayerTurn = () => `${currentPlayer}'s Turn`;
+
+        // --- Functions ---
+
+        function createBoard() {
+            // Calculate cell size based on board size for responsiveness
+            const boardSize = gameBoard.clientWidth;
+            const cellSize = boardSize / 3;
+            const fontSize = cellSize * 0.6; 
+            
+            gameBoard.innerHTML = ''; // Clear board for restart
+            for (let i = 0; i < 9; i++) {
+                const cell = document.createElement('div');
+                cell.classList.add('cell');
+                cell.dataset.cellIndex = i;
+                cell.style.fontSize = `${fontSize}px`;
+                gameBoard.appendChild(cell);
+            }
+        }
+
+        function handleCellClick(event) {
+            const clickedCell = event.target;
+            // Ensure we are clicking a cell, not the grid container
+            if (!clickedCell.classList.contains('cell')) return;
+            
+            const clickedCellIndex = parseInt(clickedCell.dataset.cellIndex);
+
+            if (gameState[clickedCellIndex] !== "" || !gameActive) {
+                return;
+            }
+
+            handleCellPlayed(clickedCell, clickedCellIndex);
+            handleResultValidation();
+        }
+        
+        function handleCellPlayed(clickedCell, clickedCellIndex) {
+            gameState[clickedCellIndex] = currentPlayer;
+            clickedCell.innerHTML = currentPlayer;
+            clickedCell.classList.add(currentPlayer === 'X' ? 'cell-x' : 'cell-o');
+        }
+        
+        function handleResultValidation() {
+            let roundWon = false;
+            let winningCombo = [];
+
+            for (let i = 0; i < winningConditions.length; i++) {
+                const winCondition = winningConditions[i];
+                let a = gameState[winCondition[0]];
+                let b = gameState[winCondition[1]];
+                let c = gameState[winCondition[2]];
+
+                if (a === '' || b === '' || c === '') {
+                    continue;
+                }
+                if (a === b && b === c) {
+                    roundWon = true;
+                    winningCombo = winCondition;
+                    break;
+                }
+            }
+
+            if (roundWon) {
+                statusDisplay.innerHTML = winningMessage();
+                highlightWinningCells(winningCombo);
+                gameActive = false;
+                setTimeout(() => showModal(winningMessage(), 'Congratulations!'), 800);
+                return;
+            }
+
+            let roundDraw = !gameState.includes("");
+            if (roundDraw) {
+                statusDisplay.innerHTML = drawMessage();
+                gameActive = false;
+                setTimeout(() => showModal(drawMessage(), "Good game!"), 800);
+                return;
+            }
+
+            handlePlayerChange();
+        }
+
+        function highlightWinningCells(winningCombo) {
+            winningCombo.forEach(index => {
+                const cell = gameBoard.querySelector(`[data-cell-index='${index}']`);
+                cell.classList.add('winning-cell', 'bg-gray-700');
+            });
+        }
+        
+        function handlePlayerChange() {
+            currentPlayer = currentPlayer === "X" ? "O" : "X";
+            statusDisplay.innerHTML = currentPlayerTurn();
+        }
+        
+        function handleRestartGame() {
+            gameActive = true;
+            currentPlayer = 'X';
+            gameState = ["", "", "", "", "", "", "", "", ""];
+            statusDisplay.innerHTML = currentPlayerTurn();
+            document.querySelectorAll('.cell').forEach(cell => {
+                cell.innerHTML = "";
+                cell.classList.remove('cell-x', 'cell-o', 'winning-cell', 'bg-gray-700');
+            });
+            hideModal();
+        }
+
+        function showModal(title, message) {
+            modalTitle.innerText = title;
+            modalMessage.innerText = message;
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modalContent.classList.remove('scale-95', 'opacity-0');
+                modalContent.classList.add('scale-100', 'opacity-100');
+            }, 10); // small delay for transition to trigger
+        }
+        
+        function hideModal() {
+            modalContent.classList.add('scale-95', 'opacity-0');
+            modalContent.classList.remove('scale-100', 'opacity-100');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 200); // match transition duration
+        }
+
+
+        // --- Event Listeners ---
+        gameBoard.addEventListener('click', handleCellClick);
+        restartButton.addEventListener('click', handleRestartGame);
+        modalButton.addEventListener('click', handleRestartGame);
+
+        // --- Initial Board Setup ---
+        // **FIX:** Use DOMContentLoaded to ensure the board element is ready before we measure it
+        window.addEventListener('DOMContentLoaded', () => {
+            createBoard();
+            window.addEventListener('resize', createBoard); // Re-create board on resize for responsiveness
+        });
+
+    </script>
+</body>
+</html>
+
